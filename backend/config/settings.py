@@ -45,6 +45,15 @@ if not DEBUG and SECRET_KEY == _INSECURE_DEFAULT_SECRET_KEY:
     )
 
 # ---------------------------------------------------------------------------
+# Google Sign-In — anyone with a verified @<ALLOWED_EMAIL_DOMAIN> Google
+# account can log in; ADMIN_EMAILS controls who gets is_staff. See
+# apps/core/views.py:google_login.
+# ---------------------------------------------------------------------------
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+ALLOWED_EMAIL_DOMAIN = os.getenv("ALLOWED_EMAIL_DOMAIN", "burntstack.com")
+ADMIN_EMAILS = env_list("ADMIN_EMAILS")
+
+# ---------------------------------------------------------------------------
 # Applications
 # ---------------------------------------------------------------------------
 DJANGO_APPS = [

@@ -12,12 +12,31 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env
 .venv/bin/python manage.py migrate
-.venv/bin/python manage.py createsuperuser   # the one real admin account
 .venv/bin/python manage.py runserver 8000
 ```
 
-Add employees via `/admin/` → Users → set `first_name`/`last_name` (used as
-the blog byline) and a password. No self-registration endpoint exists.
+## Google Sign-In
+
+Login is "Sign in with Google", restricted to a verified
+`@<ALLOWED_EMAIL_DOMAIN>` account (default `burntstack.com`) — set in
+`.env`:
+
+- `GOOGLE_CLIENT_ID` — from Google Cloud Console (OAuth consent screen +
+  a "Web application" credential, with the portal frontend's URL under
+  "Authorized JavaScript origins"). **Login is entirely rejected with a
+  503 until this is set** — there's no working fallback without it except
+  the password endpoint below.
+- `ADMIN_EMAILS` — comma-separated. Anyone whose verified Google email is
+  in this list gets `is_staff=True`, re-checked on every login.
+
+A first-time sign-in auto-creates the Django `User` — no admin
+provisioning step. The domain check uses the ID token's `hd` claim (the
+authoritative signal per Google's own docs), not just the email suffix.
+
+Password login (`POST /api/auth/token/`) still works server-side as an
+unadvertised admin/recovery fallback and is what the test suite and
+`create_test_accounts` below authenticate with — the portal's login page
+itself only shows the Google button.
 
 ## Local dev / E2E test accounts
 
@@ -33,13 +52,15 @@ frontend's `e2e/portal.spec.js` depends on these existing.
 .venv/bin/python -m pytest --cov=apps --cov-report=term-missing
 ```
 
-18 tests covering the approval-workflow state machine, ownership boundaries
+28 tests covering the approval-workflow state machine, ownership boundaries
 (an employee can't see or edit another employee's post — 404, not leaked),
-staff-only approve/reject, unauthenticated-write rejection, and — found and
-fixed during a security review of this code — that editing a
-pending/published post sends it back to `draft` rather than silently
-updating already-approved content in place. 95% statement coverage on
-`apps/` at last run.
+staff-only approve/reject, unauthenticated-write rejection, the Google
+login endpoint (domain/verification rejection, admin-email sync, no
+duplicate users on repeat logins — the real Google verification call is
+monkeypatched, not hit for real), and — found and fixed during a security
+review of this code — that editing a pending/published post sends it back
+to `draft` rather than silently updating already-approved content in
+place. 96% statement coverage on `apps/` at last run.
 
 ## API surface
 
@@ -50,8 +71,11 @@ updating already-approved content in place. 95% statement coverage on
 - `POST /api/portal/blog/<slug>/submit/` — draft → pending.
 - `POST /api/portal/blog/<slug>/approve/` / `.../reject/` — staff only.
 - `GET /api/portal/blog/pending/` — staff only.
-- `POST /api/auth/token/` / `.../refresh/` / `.../verify/` — JWT, throttled
-  at `THROTTLE_LOGIN` (default 10/min) on the obtain endpoint.
+- `POST /api/auth/google/` — the portal's actual login. `{"credential":
+  "<google id token>"}` → `{access, refresh}`.
+- `POST /api/auth/token/` / `.../refresh/` / `.../verify/` — password JWT
+  auth, throttled at `THROTTLE_LOGIN` (default 10/min); unadvertised
+  fallback, not shown in `api_root` or the login page.
 - `GET /api/auth/me/` — who's logged in.
 
 ## Not done yet

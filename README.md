@@ -15,8 +15,9 @@ history here starts fresh.
 
 ## Workflow
 
-1. The one admin creates employee accounts via Django's `/admin/` (no
-   self-registration by design).
+1. Anyone with a verified `@burntstack.com` Google account can sign in —
+   no admin provisioning needed for *access*. `ADMIN_EMAILS` (backend env
+   var) controls who gets admin rights, re-synced on every login.
 2. An employee logs in, writes a post (title, excerpt, markdown content,
    category, topic tags, cover image, reading time), saves it as a draft,
    and submits it for review.
@@ -32,12 +33,13 @@ history here starts fresh.
 ```bash
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env
+# set GOOGLE_CLIENT_ID and ADMIN_EMAILS in .env — see backend/README.md
 .venv/bin/python manage.py migrate
-.venv/bin/python manage.py createsuperuser   # the one real admin
 .venv/bin/python manage.py runserver 8000
 
 cd ../frontend && npm install
 cp .env.example .env
+# set VITE_GOOGLE_CLIENT_ID (same Client ID as the backend's)
 npm run dev
 ```
 

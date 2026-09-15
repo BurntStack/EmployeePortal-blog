@@ -7,12 +7,22 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 from apps.blog.urls import portal_urlpatterns as blog_portal_urlpatterns
-from apps.core.views import ThrottledTokenObtainPairView, api_root, health_check, me
+from apps.core.views import (
+    GoogleLoginView,
+    ThrottledTokenObtainPairView,
+    api_root,
+    health_check,
+    me,
+)
 
 api_patterns = [
     path("", api_root, name="api-root"),
     path("health/", health_check, name="health"),
-    # JWT authentication
+    # Sign in with Google — the only login path the portal UI shows.
+    path("auth/google/", GoogleLoginView.as_view(), name="google_login"),
+    # Password JWT auth stays available as an unadvertised fallback (admin
+    # recovery, and what the test suite authenticates with) but isn't
+    # listed in api_root and the login page doesn't offer it.
     path("auth/token/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/token/verify/", TokenVerifyView.as_view(), name="token_verify"),

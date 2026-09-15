@@ -12,9 +12,16 @@ internal and noindexed via a single static `<meta name="robots">` in
 
 ```bash
 npm install
-cp .env.example .env   # point VITE_API_URL at the backend
+cp .env.example .env   # point VITE_API_URL at the backend, set VITE_GOOGLE_CLIENT_ID
 npm run dev
 ```
+
+Login is "Sign in with Google" only — `VITE_GOOGLE_CLIENT_ID` must be the
+same Client ID configured on the backend (see `backend/README.md`), with
+this app's dev/prod URL added under the credential's "Authorized
+JavaScript origins" in Google Cloud Console. With no Client ID set, the
+login page shows a clear "not configured" message instead of a broken
+button.
 
 ## Routes
 
@@ -33,3 +40,7 @@ npm run test:e2e    # playwright — needs the backend running with
 The E2E spec (`e2e/portal.spec.js`) drives the full loop: unauthenticated
 redirect → employee writes + submits a post → admin approves it on the
 review screen → the post shows up on the public `GET /api/blog/` feed.
+Since nobody drives a real Google OAuth popup in CI, it authenticates via
+the backend's password endpoint directly and injects the tokens into
+localStorage rather than clicking through the login page — the Google
+flow itself is covered by the backend's own mocked-verifier tests.

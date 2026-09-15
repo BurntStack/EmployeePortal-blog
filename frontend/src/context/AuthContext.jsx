@@ -25,8 +25,20 @@ export function AuthProvider({ children }) {
     fetchMe().finally(() => setLoading(false))
   }, [fetchMe])
 
+  // Password login: not shown on the login page (Google is the only option
+  // there), but kept working as an admin/recovery fallback and for tests.
   const login = async (username, password) => {
     const { data } = await api.post('/auth/token/', { username, password })
+    localStorage.setItem('burntstack-access', data.access)
+    localStorage.setItem('burntstack-refresh', data.refresh)
+    await fetchMe()
+  }
+
+  // The actual login path: a Google ID token credential from the Sign in
+  // with Google button, verified server-side and restricted to a real
+  // @burntstack.com account.
+  const loginWithGoogle = async (credential) => {
+    const { data } = await api.post('/auth/google/', { credential })
     localStorage.setItem('burntstack-access', data.access)
     localStorage.setItem('burntstack-refresh', data.refresh)
     await fetchMe()
@@ -39,7 +51,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   )
