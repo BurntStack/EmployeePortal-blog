@@ -159,7 +159,13 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    # Non-manifest variant: the manifest-strict storage raises at WSGI-app
+    # construction time (before any request is handled) if the collectstatic
+    # manifest isn't present exactly where WhiteNoise expects it — which is
+    # what happened on Vercel's zero-config Python/Django build, taking down
+    # every single route with a bare 500 and no Django traceback even under
+    # DEBUG=True (the crash is in middleware __init__, not request handling).
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
