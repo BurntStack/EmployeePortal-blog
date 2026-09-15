@@ -52,7 +52,7 @@ api.interceptors.response.use(
     } catch {
       localStorage.removeItem('burntstack-access')
       localStorage.removeItem('burntstack-refresh')
-      window.location.href = '/portal/login'
+      window.location.href = '/login'
       return Promise.reject(error)
     }
   },

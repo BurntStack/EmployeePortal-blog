@@ -1,9 +1,13 @@
+import io
+
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import Category, Post
+from .sanitize import clean_post_html, visible_text_length
 
 
 def make_user(username, is_staff=False):
@@ -257,3 +261,103 @@ class MeEndpointTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["is_staff"])
         self.assertEqual(response.data["username"], "erin.admin")
+
+
+class ContentSanitizationTests(APITestCase):
+    """
+    `content` is real HTML from the rich text editor now, not markdown text —
+    it goes through admin approval, but that's not a substitute for treating
+    it as untrusted input on the way in.
+    """
+
+    def test_script_tags_are_stripped(self):
+        cleaned = clean_post_html("<p>Hello</p><script>alert('x')</script>")
+        self.assertNotIn("<script", cleaned)
+        self.assertIn("Hello", cleaned)
+
+    def test_disallowed_attributes_are_stripped(self):
+        cleaned = clean_post_html('<p onclick="alert(1)" style="color:red">Hi</p>')
+        self.assertNotIn("onclick", cleaned)
+        self.assertNotIn("style", cleaned)
+
+    def test_allowed_formatting_survives(self):
+        html = "<h2>Title</h2><p><strong>Bold</strong> and <em>italic</em>.</p><img src='/x.png' alt='x'>"
+        cleaned = clean_post_html(html)
+        self.assertIn("<h2>", cleaned)
+        self.assertIn("<strong>", cleaned)
+        self.assertIn("<img", cleaned)
+
+    def test_visible_text_length_ignores_markup(self):
+        html = "<p>" + ("a" * 60) + "</p>"
+        self.assertEqual(visible_text_length(html), 60)
+
+    def test_post_creation_rejects_content_thats_only_markup(self):
+        user = make_user("frank.employee")
+        self.client.force_authenticate(user=user)
+        payload = {
+            "title": "A Test Post Title",
+            "excerpt": "A sufficiently long excerpt for validation purposes.",
+            "content": "<p></p>" * 20,  # lots of markup, no real text
+            "reading_time": 5,
+        }
+        response = self.client.post(reverse("employee-post-list"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_post_creation_strips_script_tags_from_stored_content(self):
+        user = make_user("grace.employee")
+        self.client.force_authenticate(user=user)
+        payload = {
+            "title": "A Test Post Title",
+            "excerpt": "A sufficiently long excerpt for validation purposes.",
+            "content": "<p>" + ("a" * 60) + "</p><script>alert(1)</script>",
+            "reading_time": 5,
+        }
+        response = self.client.post(reverse("employee-post-list"), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        post = Post.objects.get(slug=response.data["slug"])
+        self.assertNotIn("<script", post.content)
+
+
+def make_test_image(name="test.png"):
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (2, 2), color="red").save(buf, format="PNG")
+    buf.seek(0)
+    return SimpleUploadedFile(name, buf.read(), content_type="image/png")
+
+
+class ContentImageUploadTests(APITestCase):
+    """The rich text editor's image button / drag-drop / paste all hit this."""
+
+    def setUp(self):
+        self.user = make_user("henry.employee")
+        self.url = reverse("content-image-upload")
+
+    def test_unauthenticated_upload_is_rejected(self):
+        response = self.client.post(self.url, {"image": make_test_image()}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_authenticated_upload_returns_a_url(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(self.url, {"image": make_test_image()}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["url"].startswith("http"))
+        self.assertIn("blog-content/", response.data["url"])
+
+    def test_missing_file_is_rejected(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(self.url, {}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_non_image_content_type_is_rejected(self):
+        self.client.force_authenticate(user=self.user)
+        bad_file = SimpleUploadedFile("notes.txt", b"just text", content_type="text/plain")
+        response = self.client.post(self.url, {"image": bad_file}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_oversized_file_is_rejected(self):
+        self.client.force_authenticate(user=self.user)
+        huge = SimpleUploadedFile("big.png", b"0" * (8 * 1024 * 1024 + 1), content_type="image/png")
+        response = self.client.post(self.url, {"image": huge}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

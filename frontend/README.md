@@ -3,10 +3,19 @@
 React + Vite. The whole app is the portal (no `/portal/*` prefix — that only
 existed when this lived inside the marketing site). Reuses the marketing
 site's design tokens (`src/index.css`) so it still looks like a BurntStack
-product, but otherwise has no dependency on that codebase: no
-framer-motion/gsap/lenis, no `react-helmet-async` — the whole app is
-internal and noindexed via a single static `<meta name="robots">` in
-`index.html` rather than per-page SEO plumbing.
+product, but otherwise has no dependency on that codebase: no gsap/lenis,
+no `react-helmet-async` — the whole app is internal and noindexed via a
+single static `<meta name="robots">` in `index.html` rather than per-page
+SEO plumbing.
+
+The post editor (`src/components/editor/`) is a real rich text editor
+(TipTap), not a plain textarea — bold/italic/underline/strike, headings,
+lists, blockquote, code blocks, links, and inline images via the toolbar
+button, drag-drop, or paste (each uploads to the backend and embeds a URL,
+never inlines base64). `content` is stored as sanitized HTML. `framer-motion`
+is used deliberately but sparingly: button press/hover feedback and the
+editor's own entrance/upload-indicator animations, all skipped under
+`prefers-reduced-motion`.
 
 ## Setup
 

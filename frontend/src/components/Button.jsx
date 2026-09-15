@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/utils/cn.js'
+
+const MotionLink = motion.create(Link)
 
 const VARIANTS = {
   primary:
@@ -27,6 +30,7 @@ export default function Button({
   className,
   ...props
 }) {
+  const reduceMotion = useReducedMotion()
   const classes = cn(
     'inline-flex items-center justify-center font-semibold tracking-[-0.01em] whitespace-nowrap',
     'transition-colors duration-150 ease-out',
@@ -36,24 +40,27 @@ export default function Button({
     VARIANTS[variant],
     className,
   )
+  const tap = reduceMotion || props.disabled ? undefined : { scale: 0.96 }
+  const hover = reduceMotion || props.disabled ? undefined : { scale: 1.015 }
+  const spring = { type: 'spring', stiffness: 500, damping: 30 }
 
   if (to) {
     return (
-      <Link to={to} className={classes} {...props}>
+      <MotionLink to={to} className={classes} whileTap={tap} whileHover={hover} transition={spring} {...props}>
         {children}
-      </Link>
+      </MotionLink>
     )
   }
   if (href) {
     return (
-      <a href={href} className={classes} {...props}>
+      <motion.a href={href} className={classes} whileTap={tap} whileHover={hover} transition={spring} {...props}>
         {children}
-      </a>
+      </motion.a>
     )
   }
   return (
-    <button className={classes} {...props}>
+    <motion.button className={classes} whileTap={tap} whileHover={hover} transition={spring} {...props}>
       {children}
-    </button>
+    </motion.button>
   )
 }

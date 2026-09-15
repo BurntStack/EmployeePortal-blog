@@ -19,4 +19,16 @@ describe('estimateReadingTime', () => {
     const words = Array(400).fill('word').join('   \n  ')
     expect(estimateReadingTime(words)).toBe(2)
   })
+
+  it('strips HTML markup before counting words', () => {
+    const words = Array(400).fill('word').join(' ')
+    const html = `<h1>Title</h1><p>${words}</p><ul><li>word</li></ul>`
+    expect(estimateReadingTime(html)).toBe(2)
+  })
+
+  it('does not count image alt text or attribute values as words', () => {
+    const altWords = Array(500).fill('alt-word').join(' ')
+    const html = `<p>one two three</p><img src="/x.png" alt="${altWords}">`
+    expect(estimateReadingTime(html)).toBe(1) // only "one two three" is real prose
+  })
 })

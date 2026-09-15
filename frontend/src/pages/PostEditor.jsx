@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import Button from '@/components/Button.jsx'
 import PortalShell from '@/components/PortalShell.jsx'
+import RichTextEditor from '@/components/editor/RichTextEditor.jsx'
 import api from '@/lib/axios.js'
 import { estimateReadingTime } from '@/lib/readingTime.js'
 
@@ -91,7 +93,13 @@ export default function PostEditor() {
 
   return (
     <PortalShell title={isEdit ? 'Edit Post' : 'New Post'}>
-      <form onSubmit={save} className="flex max-w-3xl flex-col gap-5 rounded-bento border border-line bg-white p-6 sm:p-8">
+      <motion.form
+        onSubmit={save}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        className="flex max-w-3xl flex-col gap-5 rounded-bento border border-line bg-white p-6 sm:p-8"
+      >
         <Field id="title" label="Title" value={form.title} onChange={update('title')} required />
 
         <div className="flex flex-col gap-2">
@@ -108,14 +116,11 @@ export default function PostEditor() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="content" className="text-sm font-medium text-ink">Content (Markdown supported)</label>
-          <textarea
-            id="content"
-            value={form.content}
-            onChange={update('content')}
-            rows={14}
-            required
-            className="rounded-xl border border-line-strong bg-canvas px-4 py-3 text-sm text-ink outline-none transition-colors focus:border-orange-400"
+          <label htmlFor="content" className="text-sm font-medium text-ink">Content</label>
+          <RichTextEditor
+            key={slug || 'new'}
+            content={form.content}
+            onChange={(html) => setForm((f) => ({ ...f, content: html }))}
           />
         </div>
 
@@ -179,7 +184,7 @@ export default function PostEditor() {
             Cancel
           </Button>
         </div>
-      </form>
+      </motion.form>
     </PortalShell>
   )
 }

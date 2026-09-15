@@ -1,9 +1,14 @@
+import uuid
+
+from django.core.files.storage import default_storage
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import Category, Post
 from .permissions import IsAdmin, IsOwnerOrAdmin
@@ -13,6 +18,34 @@ from .serializers import (
     PostListSerializer,
     PostWriteSerializer,
 )
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8MB
+
+
+class ContentImageUploadView(APIView):
+    """
+    Image upload for the rich text editor. Drag-drop, paste, and the
+    toolbar's image button all POST here and embed the returned URL in the
+    post's HTML content, instead of inlining base64 image data in `content`
+    itself (which would bloat every request and the stored row).
+    """
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        image = request.FILES.get("image")
+        if not image:
+            return Response({"detail": "No image file provided."}, status=http_status.HTTP_400_BAD_REQUEST)
+        if image.content_type not in ALLOWED_IMAGE_TYPES:
+            return Response({"detail": "Unsupported image type."}, status=http_status.HTTP_400_BAD_REQUEST)
+        if image.size > MAX_UPLOAD_BYTES:
+            return Response({"detail": "Image is too large (max 8MB)."}, status=http_status.HTTP_400_BAD_REQUEST)
+        ext = image.name.rsplit(".", 1)[-1].lower() if "." in image.name else "jpg"
+        path = default_storage.save(f"blog-content/{uuid.uuid4().hex}.{ext}", image)
+        url = request.build_absolute_uri(default_storage.url(path))
+        return Response({"url": url}, status=http_status.HTTP_201_CREATED)
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):

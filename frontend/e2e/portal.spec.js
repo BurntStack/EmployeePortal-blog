@@ -55,7 +55,9 @@ test.describe('employee blog portal', () => {
 
     await page.fill('#title', title)
     await page.fill('#excerpt', 'An excerpt written by the Playwright E2E spec.')
-    await page.fill('#content', 'Full body content for the automated end-to-end test. '.repeat(10))
+    // Content is a TipTap rich text editor now, not a plain textarea.
+    await page.click('.rte-content')
+    await page.keyboard.type('Full body content for the automated end-to-end test. '.repeat(10))
     await page.fill('#tags', 'e2e, playwright')
     await page.click('button:has-text("Save Draft")')
     await page.waitForURL('**/')

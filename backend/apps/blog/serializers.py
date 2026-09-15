@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Category, Post
+from .sanitize import clean_post_html, visible_text_length
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -83,6 +84,7 @@ class PostWriteSerializer(serializers.ModelSerializer):
         return value.strip()
 
     def validate_content(self, value):
-        if len(value.strip()) < 50:
+        cleaned = clean_post_html(value.strip())
+        if visible_text_length(cleaned) < 50:
             raise serializers.ValidationError("Content must be at least 50 characters.")
-        return value.strip()
+        return cleaned
