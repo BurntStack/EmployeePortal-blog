@@ -1,8 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token as google_id_token
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -27,7 +25,17 @@ def verify_google_token(credential):
     Verify a Google ID token and return its decoded claims. Split into its
     own function so tests can monkeypatch it instead of calling out to
     Google's network for every test run.
+
+    Imports are deliberately local, not module-level: config/urls.py imports
+    this module eagerly for every request regardless of route (Django loads
+    the whole URLconf graph up front), so a module-level import of
+    google-auth's dependency chain (requests, rsa, pyasn1, cachetools, ...)
+    was being paid on cold start even for requests that never touch Google
+    Sign-In, like the public blog feed.
     """
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
     return google_id_token.verify_oauth2_token(
         credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID
     )
