@@ -1,3 +1,8 @@
 {
-  "regions": ["hnd1"]
+  "regions": ["hnd1"],
+  "functions": {
+    "config/wsgi.py": {
+      "memory": 3009
+    }
+  }
 }
