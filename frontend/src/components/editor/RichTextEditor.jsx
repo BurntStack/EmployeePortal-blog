@@ -7,7 +7,9 @@ import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
 import { AnimatePresence, motion } from 'framer-motion'
 import Toolbar from '@/components/editor/Toolbar.jsx'
+import SlashCommand from '@/components/editor/SlashCommand.js'
 import { uploadContentImage } from '@/lib/uploadImage.js'
+import 'tippy.js/dist/tippy.css'
 
 function imageFileFrom(fileList) {
   return Array.from(fileList || []).find((f) => f.type.startsWith('image/'))
@@ -48,7 +50,15 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Tell 
         link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer nofollow' } },
       }),
       Image.configure({ HTMLAttributes: { class: 'rte-image' } }),
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({
+        // Only hint the slash-command shortcut on the very first, empty
+        // line - not on every blank paragraph throughout a long post.
+        placeholder: ({ node, editor }) => {
+          if (node.type.name !== 'paragraph') return ''
+          return editor.isEmpty ? `${placeholder} Type '/' for commands` : ''
+        },
+      }),
+      SlashCommand,
     ],
     content,
     editorProps: {
