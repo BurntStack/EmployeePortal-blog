@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
+import { DOMParser as ProseMirrorDOMParser } from '@tiptap/pm/model'
+import { marked } from 'marked'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -9,6 +11,20 @@ import { uploadContentImage } from '@/lib/uploadImage.js'
 
 function imageFileFrom(fileList) {
   return Array.from(fileList || []).find((f) => f.type.startsWith('image/'))
+}
+
+// A lot of people write in ChatGPT (or another markdown-first tool) and
+// paste the result straight in. When the clipboard only has plain text
+// (no rich text/html alternative), that plain text is markdown *source* -
+// without this, "**bold**" and "## Heading" land as literal asterisks and
+// hashes instead of real formatting.
+export const MARKDOWN_SIGNAL = /(^#{1,3}\s+\S)|(\*\*[^*\n]+\*\*)|(^[-*]\s+\S)|(^\d+\.\s+\S)|(\[[^\]]+\]\([^)]+\))/m
+
+function insertMarkdownAsRichContent(view, markdownText) {
+  const html = marked.parse(markdownText)
+  const dom = new window.DOMParser().parseFromString(html, 'text/html')
+  const slice = ProseMirrorDOMParser.fromSchema(view.state.schema).parseSlice(dom.body)
+  view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView())
 }
 
 /**
@@ -54,16 +70,27 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Tell 
       },
       handlePaste(view, event) {
         const file = imageFileFrom(event.clipboardData?.files)
-        if (!file) return false
-        event.preventDefault()
-        setUploading(true)
-        uploadContentImage(file)
-          .then((url) => {
-            const node = view.state.schema.nodes.image.create({ src: url, alt: file.name })
-            view.dispatch(view.state.tr.replaceSelectionWith(node))
-          })
-          .finally(() => setUploading(false))
-        return true
+        if (file) {
+          event.preventDefault()
+          setUploading(true)
+          uploadContentImage(file)
+            .then((url) => {
+              const node = view.state.schema.nodes.image.create({ src: url, alt: file.name })
+              view.dispatch(view.state.tr.replaceSelectionWith(node))
+            })
+            .finally(() => setUploading(false))
+          return true
+        }
+
+        const hasRichHtml = event.clipboardData?.getData('text/html')
+        const plainText = event.clipboardData?.getData('text/plain')
+        if (!hasRichHtml && plainText && MARKDOWN_SIGNAL.test(plainText)) {
+          event.preventDefault()
+          insertMarkdownAsRichContent(view, plainText)
+          return true
+        }
+
+        return false
       },
     },
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
