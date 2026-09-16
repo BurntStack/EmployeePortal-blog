@@ -290,6 +290,23 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
+.rte-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  display: block;
+  overflow-x: auto;
+}
+.rte-content th,
+.rte-content td {
+  border: 1px solid var(--color-line-strong);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+.rte-content th {
+  background: var(--color-sand);
+  font-weight: 600;
+}
 .rte-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--color-mute);

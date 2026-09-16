@@ -12,6 +12,7 @@ from django.utils.html import strip_tags
 ALLOWED_TAGS = [
     "p", "br", "strong", "em", "u", "s", "a", "ul", "ol", "li",
     "h1", "h2", "h3", "blockquote", "code", "pre", "img", "hr",
+    "table", "thead", "tbody", "tr", "th", "td",
 ]
 ALLOWED_ATTRIBUTES = {
     "a": ["href", "title", "target", "rel"],

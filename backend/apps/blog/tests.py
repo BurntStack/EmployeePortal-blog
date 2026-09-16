@@ -287,6 +287,12 @@ class ContentSanitizationTests(APITestCase):
         self.assertIn("<strong>", cleaned)
         self.assertIn("<img", cleaned)
 
+    def test_tables_survive_sanitization(self):
+        html = "<table><thead><tr><th>Plan</th></tr></thead><tbody><tr><td>Starter</td></tr></tbody></table>"
+        cleaned = clean_post_html(html)
+        self.assertIn("<table>", cleaned)
+        self.assertIn("<td>Starter</td>", cleaned)
+
     def test_visible_text_length_ignores_markup(self):
         html = "<p>" + ("a" * 60) + "</p>"
         self.assertEqual(visible_text_length(html), 60)
