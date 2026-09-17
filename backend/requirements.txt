@@ -8,6 +8,9 @@ psycopg2-binary==2.9.10
 python-dotenv==1.1.1
 whitenoise==6.8.2
 Pillow==11.3.0
+# S3-compatible media storage (Supabase Storage in production).
+django-storages==1.14.4
+boto3==1.35.81
 gunicorn==23.0.0
 google-auth==2.36.0
 requests==2.32.3

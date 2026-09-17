@@ -13,6 +13,8 @@ import dj_database_url
 from dotenv import load_dotenv
 import os
 
+from apps.core import storage_config
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from backend/.env if present.
@@ -157,8 +159,54 @@ USE_TZ = True
 # ---------------------------------------------------------------------------
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Media goes to S3-compatible object storage (Supabase Storage) whenever the
+# credentials are present, and to local disk otherwise.
+#
+# Local disk is a development-only arrangement and was silently broken in
+# production: Vercel's filesystem is read-only outside /tmp and is thrown
+# away between invocations, and `config/urls.py` only routes MEDIA_URL under
+# DEBUG - so `/media/<anything>` returned 404 in production and every
+# uploaded image rendered as a broken <img>, in the post editor and on the
+# public blog feed alike. See apps/core/storage_config.py.
+MEDIA_STORAGE_CONFIGURED = storage_config.is_configured(os.environ)
+
+if MEDIA_STORAGE_CONFIGURED:
+    _media_backend = "storages.backends.s3boto3.S3Boto3Storage"
+
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL")
+    # Supabase's S3 gateway requires a region even though it ignores it.
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    # Supabase requires path-style addressing (its own docs set
+    # forcePathStyle). botocore's "auto" default happens to pick path
+    # style for this endpoint today, but that is an inference about a
+    # custom endpoint rather than a guarantee - pin it so a future
+    # botocore release cannot silently switch to virtual-hosted style
+    # and break every upload.
+    AWS_S3_ADDRESSING_STYLE = "path"
+    # Supabase has no per-object ACLs; sending one is rejected.
+    AWS_DEFAULT_ACL = None
+    # Two uploads of "photo.jpg" must not clobber each other - posts already
+    # published would silently swap images.
+    AWS_S3_FILE_OVERWRITE = False
+    # Unsigned URLs. Signed ones expire, and these URLs are written into
+    # stored post HTML that has to keep working indefinitely.
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_CUSTOM_DOMAIN = storage_config.public_base_url(
+        AWS_S3_ENDPOINT_URL,
+        AWS_STORAGE_BUCKET_NAME,
+        override=os.getenv("AWS_S3_CUSTOM_DOMAIN"),
+    )
+    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "public, max-age=31536000, immutable"}
+else:
+    _media_backend = "django.core.files.storage.FileSystemStorage"
+
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": {"BACKEND": _media_backend},
     # Non-manifest variant: the manifest-strict storage raises at WSGI-app
     # construction time (before any request is handled) if the collectstatic
     # manifest isn't present exactly where WhiteNoise expects it — which is
@@ -167,6 +215,8 @@ STORAGES = {
     # DEBUG=True (the crash is in middleware __init__, not request handling).
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
+# Only used by the local-disk fallback; S3Boto3Storage builds absolute
+# URLs from AWS_S3_CUSTOM_DOMAIN and ignores both of these.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
