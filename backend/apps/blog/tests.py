@@ -1,6 +1,8 @@
 import io
+from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
@@ -367,3 +369,68 @@ class ContentImageUploadTests(APITestCase):
         huge = SimpleUploadedFile("big.png", b"0" * (8 * 1024 * 1024 + 1), content_type="image/png")
         response = self.client.post(self.url, {"image": huge}, format="multipart")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_absolute_storage_url_is_returned_unchanged(self):
+        """
+        With remote storage, `default_storage.url()` already returns an
+        absolute URL. The view passes it through `build_absolute_uri`,
+        which must leave it alone - prefixing the API host would produce
+        something like https://api.example.com/https://... and every
+        uploaded image would render broken, which is exactly the symptom
+        that local-disk storage caused in production.
+        """
+        self.client.force_authenticate(user=self.user)
+        remote = "https://abc.supabase.co/storage/v1/object/public/blog-media/blog-content/x.png"
+        with mock.patch.object(default_storage, "url", return_value=remote), mock.patch.object(
+            default_storage, "save", return_value="blog-content/x.png"
+        ):
+            response = self.client.post(self.url, {"image": make_test_image()}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["url"], remote)
+
+    def test_relative_storage_url_is_made_absolute(self):
+        """The local-disk fallback still needs the host prepended."""
+        self.client.force_authenticate(user=self.user)
+        with mock.patch.object(default_storage, "url", return_value="/media/blog-content/x.png"), mock.patch.object(
+            default_storage, "save", return_value="blog-content/x.png"
+        ):
+            response = self.client.post(self.url, {"image": make_test_image()}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["url"], "http://testserver/media/blog-content/x.png")
+
+    def test_stored_key_is_randomised_so_uploads_cannot_collide(self):
+        """
+        Two authors uploading "photo.png" must not overwrite each other -
+        with AWS_S3_FILE_OVERWRITE=False the second would silently win and
+        swap the image inside an already-published post.
+        """
+        self.client.force_authenticate(user=self.user)
+        keys = []
+        real_save = default_storage.save
+
+        def capture(name, content, **kwargs):
+            keys.append(name)
+            return real_save(name, content, **kwargs)
+
+        with mock.patch.object(default_storage, "save", side_effect=capture):
+            for _ in range(2):
+                self.client.post(
+                    self.url, {"image": make_test_image("photo.png")}, format="multipart"
+                )
+        self.assertEqual(len(keys), 2)
+        self.assertNotEqual(keys[0], keys[1])
+        for key in keys:
+            self.assertTrue(key.startswith("blog-content/"))
+            self.assertTrue(key.endswith(".png"))
+
+    def test_storage_failure_returns_a_clear_error_not_a_500(self):
+        """
+        If object storage is misconfigured or unreachable, the author needs
+        to be told - a bare 500 reaches the editor as a generic failure that
+        looks identical to the button doing nothing at all.
+        """
+        self.client.force_authenticate(user=self.user)
+        with mock.patch.object(default_storage, "save", side_effect=OSError("bucket gone")):
+            response = self.client.post(self.url, {"image": make_test_image()}, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertIn("storage", response.data["detail"].lower())

@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from django.core.files.storage import default_storage
@@ -18,6 +19,8 @@ from .serializers import (
     PostListSerializer,
     PostWriteSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8MB
@@ -43,8 +46,21 @@ class ContentImageUploadView(APIView):
         if image.size > MAX_UPLOAD_BYTES:
             return Response({"detail": "Image is too large (max 8MB)."}, status=http_status.HTTP_400_BAD_REQUEST)
         ext = image.name.rsplit(".", 1)[-1].lower() if "." in image.name else "jpg"
-        path = default_storage.save(f"blog-content/{uuid.uuid4().hex}.{ext}", image)
-        url = request.build_absolute_uri(default_storage.url(path))
+        try:
+            path = default_storage.save(f"blog-content/{uuid.uuid4().hex}.{ext}", image)
+            # Remote storage returns an absolute URL and build_absolute_uri
+            # passes it through untouched; the local-disk fallback returns
+            # "/media/..." and needs the host prepended.
+            url = request.build_absolute_uri(default_storage.url(path))
+        except Exception:
+            # Misconfigured or unreachable object storage. Without this the
+            # author gets a bare 500 and the editor shows a generic failure,
+            # which is indistinguishable from "the button does nothing".
+            logger.exception("Content image upload failed for user %s", request.user)
+            return Response(
+                {"detail": "Image storage is unavailable right now. Please try again."},
+                status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         return Response({"url": url}, status=http_status.HTTP_201_CREATED)
 
 
