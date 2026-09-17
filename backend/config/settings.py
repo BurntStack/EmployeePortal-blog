@@ -181,6 +181,13 @@ if MEDIA_STORAGE_CONFIGURED:
     # Supabase's S3 gateway requires a region even though it ignores it.
     AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
     AWS_S3_SIGNATURE_VERSION = "s3v4"
+    # Supabase requires path-style addressing (its own docs set
+    # forcePathStyle). botocore's "auto" default happens to pick path
+    # style for this endpoint today, but that is an inference about a
+    # custom endpoint rather than a guarantee - pin it so a future
+    # botocore release cannot silently switch to virtual-hosted style
+    # and break every upload.
+    AWS_S3_ADDRESSING_STYLE = "path"
     # Supabase has no per-object ACLs; sending one is rejected.
     AWS_DEFAULT_ACL = None
     # Two uploads of "photo.jpg" must not clobber each other - posts already
