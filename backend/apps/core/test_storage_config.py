@@ -43,6 +43,16 @@ class PublicBaseUrlTests(SimpleTestCase):
             "abcdefghijkl.supabase.co/storage/v1/object/public/blog-media",
         )
 
+    def test_storage_subdomain_endpoint_form_also_works(self):
+        # Supabase's docs give the endpoint as <ref>.storage.supabase.co
+        # while older projects use <ref>.supabase.co. Both host forms serve
+        # public objects (verified against a live bucket), so both must
+        # derive a working base rather than only the one we happened to see.
+        self.assertEqual(
+            public_base_url("https://abcdefghijkl.storage.supabase.co/storage/v1/s3", "blog-media"),
+            "abcdefghijkl.storage.supabase.co/storage/v1/object/public/blog-media",
+        )
+
     def test_supabase_endpoint_tolerates_a_trailing_slash(self):
         self.assertEqual(
             public_base_url(SUPABASE_ENDPOINT + "/", "blog-media"),
