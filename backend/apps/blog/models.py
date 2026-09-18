@@ -50,6 +50,10 @@ class Post(TimeStampedModel):
 
     class Meta(TimeStampedModel.Meta):
         ordering = ["-published_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-published_at"], name="post_pub_status_date_idx"),
+            models.Index(fields=["category", "status", "-published_at"], name="post_cat_status_date_idx"),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.slug:

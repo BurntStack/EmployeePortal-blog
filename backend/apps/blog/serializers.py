@@ -33,17 +33,33 @@ class PostListSerializer(serializers.ModelSerializer):
 class PostDetailSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     author = serializers.SerializerMethodField()
+    related_posts = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         fields = [
             "id", "title", "slug", "excerpt", "content", "category", "author",
             "cover_image", "tags", "reading_time", "is_featured", "published_at",
-            "created_at",
+            "created_at", "related_posts",
         ]
 
     def get_author(self, obj):
         return _author_name(obj)
+
+    def get_related_posts(self, obj):
+        if not obj.category_id:
+            return []
+        posts = (
+            Post.objects.filter(
+                category_id=obj.category_id,
+                status=Post.Status.PUBLISHED,
+                published_at__isnull=False,
+            )
+            .exclude(pk=obj.pk)
+            .select_related("category", "author")
+            .order_by("-published_at", "-created_at")[:3]
+        )
+        return PostListSerializer(posts, many=True, context=self.context).data
 
 
 class PostWriteSerializer(serializers.ModelSerializer):

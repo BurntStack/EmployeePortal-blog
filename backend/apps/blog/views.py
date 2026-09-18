@@ -2,7 +2,9 @@ import logging
 import uuid
 
 from django.core.files.storage import default_storage
+from django.utils.decorators import method_decorator
 from django.utils import timezone
+from django.views.decorators.cache import cache_page
 from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -22,7 +24,7 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"}
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8MB
 
 
@@ -64,6 +66,7 @@ class ContentImageUploadView(APIView):
         return Response({"url": url}, status=http_status.HTTP_201_CREATED)
 
 
+@method_decorator(cache_page(300), name="dispatch")
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     """Public, read-only list of blog categories."""
 
@@ -72,12 +75,13 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
 
+@method_decorator(cache_page(300), name="dispatch")
 class PostViewSet(viewsets.ReadOnlyModelViewSet):
     """Public, read-only access to published blog posts."""
 
-    queryset = Post.objects.filter(status=Post.Status.PUBLISHED).select_related(
-        "category", "author"
-    )
+    queryset = Post.objects.filter(
+        status=Post.Status.PUBLISHED, published_at__isnull=False
+    ).select_related("category", "author")
     lookup_field = "slug"
     filterset_fields = ["category__slug", "is_featured"]
     search_fields = ["title", "excerpt", "content"]
