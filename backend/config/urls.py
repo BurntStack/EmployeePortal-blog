@@ -6,7 +6,8 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
-from apps.blog.urls import portal_urlpatterns as blog_portal_urlpatterns
+from apps.blog.urls import portal_urlpatterns as blog_portal_urlpatterns, admin_urlpatterns
+from apps.blog.admin_views import EditorialJobsView
 from apps.core.views import (
     GoogleLoginView,
     ThrottledTokenObtainPairView,
@@ -30,6 +31,8 @@ api_patterns = [
     # Public, read-only feed — this is what burntstack.com/blog fetches.
     path("blog/", include("apps.blog.urls")),
     # Employee portal — authenticated blog CRUD + review workflow.
+    path("portal/jobs/", EditorialJobsView.as_view()),
+    path("portal/admin/", include(admin_urlpatterns)),
     path("portal/blog/", include(blog_portal_urlpatterns)),
 ]
 

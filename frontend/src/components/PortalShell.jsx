@@ -15,11 +15,11 @@ export default function PortalShell({ title, children }) {
   return (
     <div className="min-h-screen bg-ivory">
       <header className="border-b border-line bg-white">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-6 px-5 sm:px-8">
+        <div className="mx-auto flex min-h-16 flex-wrap py-3 max-w-6xl items-center justify-between gap-6 px-5 sm:px-8">
           <Link to="/" className="font-display text-lg font-bold tracking-[-0.02em] text-ink">
             Burnt<span className="text-orange-600">Stack</span> <span className="text-mute font-medium">Portal</span>
           </Link>
-          <nav className="hidden items-center gap-6 sm:flex" aria-label="Portal">
+          <nav className="order-3 flex w-full flex-wrap items-center gap-4 sm:order-none sm:w-auto" aria-label="Portal">
             {LINKS.map((link) => (
               <NavLink
                 key={link.to}
@@ -32,7 +32,7 @@ export default function PortalShell({ title, children }) {
                 {link.label}
               </NavLink>
             ))}
-            {user?.is_staff && (
+            {(user?.can_review || user?.is_staff) && (
               <NavLink
                 to="/review"
                 className={({ isActive }) =>
@@ -42,11 +42,13 @@ export default function PortalShell({ title, children }) {
                 Review
               </NavLink>
             )}
+            {(user?.can_review || user?.is_staff) && <NavLink to="/admin/overview" className="text-sm font-medium text-orange-600">Admin workspace</NavLink>}
+            <NavLink to="/notifications" className="text-sm font-medium text-slate">Notifications</NavLink>
           </nav>
           <div className="flex items-center gap-4">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold text-ink">{user?.first_name} {user?.last_name}</p>
-              <p className="text-xs text-mute">{user?.is_staff ? 'Admin' : 'Employee'}</p>
+              <p className="text-xs text-mute">{user?.role || (user?.is_staff ? 'Admin' : 'Contributor')}</p>
             </div>
             <button
               type="button"

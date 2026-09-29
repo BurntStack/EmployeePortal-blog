@@ -75,8 +75,9 @@ test.describe('employee blog portal', () => {
     await page.getByRole('link', { name: 'Review' }).click()
     await page.waitForURL('**/review')
     await expect(page.getByText(title)).toBeVisible()
-    await page.locator('button:has-text("Approve")').first().click()
-    await expect(page.getByText('Nothing waiting for review').or(page.getByText(title))).toBeVisible()
+    await page.getByRole('link', { name: title, exact: true }).click()
+    await page.getByRole('button', { name: 'Approve and publish', exact: true }).click()
+    await expect(page.getByText('An approved version is live')).toBeVisible()
 
     // Now public.
     await expect
