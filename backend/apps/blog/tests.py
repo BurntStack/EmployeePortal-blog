@@ -8,7 +8,6 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .editorial import save_revision, publish
 from .models import Category, Post
 from .sanitize import clean_post_html, visible_text_length
 
@@ -105,11 +104,11 @@ class PostWorkflowTests(APITestCase):
 
     def approve(self, user, slug):
         self.auth(user)
-        return self.client.post(reverse("employee-post-approve", args=[slug]), {"expected_version": Post.objects.get(slug=slug).version}, format="json")
+        return self.client.post(reverse("employee-post-approve", args=[slug]))
 
     def reject(self, user, slug):
         self.auth(user)
-        return self.client.post(reverse("employee-post-reject", args=[slug]), {"expected_version": Post.objects.get(slug=slug).version, "body": "Please revise the unsupported claims."}, format="json")
+        return self.client.post(reverse("employee-post-reject", args=[slug]))
 
     def test_full_approval_workflow_and_public_visibility(self):
         slug = self.create_post(self.employee).data["slug"]
@@ -149,12 +148,12 @@ class PostWorkflowTests(APITestCase):
         response = self.approve(self.admin, slug)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_reject_returns_a_pending_post_with_feedback(self):
+    def test_reject_sends_a_pending_post_back_to_draft(self):
         slug = self.create_post(self.employee).data["slug"]
         self.submit(self.employee, slug)
         response = self.reject(self.admin, slug)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["status"], Post.Status.REJECTED)
+        self.assertEqual(response.data["status"], Post.Status.DRAFT)
 
     def test_non_staff_cannot_reject(self):
         slug = self.create_post(self.employee).data["slug"]
@@ -178,15 +177,15 @@ class PostWorkflowTests(APITestCase):
         patch = self.client.patch(detail_url, {"title": "Edited After Approval"}, format="json")
         self.assertEqual(patch.status_code, status.HTTP_200_OK)
         self.assertEqual(patch.data["status"], Post.Status.DRAFT)
-        self.assertIsNotNone(patch.data["published_at"])
+        self.assertIsNone(patch.data["published_at"])
 
-        # The previously approved snapshot remains public during revision.
+        # The edit is not live — the post dropped off the public feed entirely.
         public_response = self.client.get(reverse("post-detail", args=[slug]))
-        self.assertEqual(public_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(public_response.data["title"], "A Test Post Title")
+        self.assertEqual(public_response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_staff_edits_also_require_fresh_approval(self):
-        # Every content edit creates a working draft; the approved snapshot stays live.
+    def test_staff_editing_a_published_post_keeps_it_published(self):
+        # A reviewer fixing a typo on an already-approved post shouldn't have
+        # to re-approve their own edit.
         slug = self.create_post(self.employee).data["slug"]
         self.submit(self.employee, slug)
         self.approve(self.admin, slug)
@@ -194,7 +193,7 @@ class PostWorkflowTests(APITestCase):
         self.auth(self.admin)
         detail_url = reverse("employee-post-detail", args=[slug])
         patch = self.client.patch(detail_url, {"title": "Typo Fixed"}, format="json")
-        self.assertEqual(patch.data["status"], Post.Status.DRAFT)
+        self.assertEqual(patch.data["status"], Post.Status.PUBLISHED)
 
     def test_pending_queue_is_admin_only_and_lists_everyones_submissions(self):
         slug1 = self.create_post(self.employee).data["slug"]
@@ -238,7 +237,6 @@ class PublicFeedTests(APITestCase):
             title="Published Post", excerpt="e" * 20, content="c" * 60,
             author=self.author, status=Post.Status.PUBLISHED, category=self.category,
         )
-        publish(published, save_revision(published, self.author), self.author)
         response = self.client.get(reverse("post-list"))
         slugs = [p["slug"] for p in response.data["results"]]
         self.assertEqual(slugs, [published.slug])
@@ -248,7 +246,6 @@ class PublicFeedTests(APITestCase):
             title="Published Post", excerpt="e" * 20, content="c" * 60,
             author=self.author, status=Post.Status.PUBLISHED, category=self.category,
         )
-        publish(post, save_revision(post, self.author), self.author)
         response = self.client.get(reverse("post-detail", args=[post.slug]))
         self.assertEqual(response.data["author"], "Dana Doe")
         self.assertEqual(response.data["category"]["name"], "AI")

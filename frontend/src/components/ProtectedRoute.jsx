@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext.jsx'
 
 /** Gates a portal route behind login, and optionally behind `is_staff`. */
-export default function ProtectedRoute({ children, adminOnly = false, reviewerOnly = false }) {
+export default function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -14,8 +14,7 @@ export default function ProtectedRoute({ children, adminOnly = false, reviewerOn
   }
 
   if (!user) return <Navigate to="/login" replace />
-  if (reviewerOnly && !user.can_review && !user.is_staff) return <Navigate to="/" replace />
-  if (adminOnly && user.role !== 'admin' && !user.is_staff) return <Navigate to="/" replace />
+  if (adminOnly && !user.is_staff) return <Navigate to="/" replace />
 
   return children
 }

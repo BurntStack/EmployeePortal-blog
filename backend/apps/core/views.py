@@ -93,22 +93,10 @@ class GoogleLoginView(APIView):
                 "last_name": payload.get("family_name", ""),
             },
         )
-        if not user.is_active:
-            return Response({"detail": "Your portal access has been disabled."}, status=status.HTTP_403_FORBIDDEN)
-        # Explicit portal role assignments survive Google sign-in. ADMIN_EMAILS
-        # continues to bootstrap accounts without a managed role.
-        from apps.blog.models import Membership
-        membership = Membership.objects.filter(user=user).first()
-        if membership:
-            is_admin = membership.role == "admin"
-        if user.is_superuser:
-            is_admin = True
         if user.is_staff != is_admin:
             user.is_staff = is_admin
             user.save(update_fields=["is_staff"])
 
-        user.last_login = timezone.now()
-        user.save(update_fields=["last_login"])
         refresh = RefreshToken.for_user(user)
         return Response({"access": str(refresh.access_token), "refresh": str(refresh)})
 
@@ -125,8 +113,6 @@ def health_check(request):
 def me(request):
     """Who's logged in — the portal uses this to decide what to show."""
     user = request.user
-    from apps.blog.permissions import role_for, can_review
-    from apps.blog.models import Notification
     return Response(
         {
             "id": user.id,
@@ -135,9 +121,6 @@ def me(request):
             "last_name": user.last_name,
             "email": user.email,
             "is_staff": user.is_staff,
-            "role": role_for(user),
-            "can_review": can_review(user),
-            "unread_notifications": Notification.objects.filter(recipient=user, read_at__isnull=True).count(),
         }
     )
 

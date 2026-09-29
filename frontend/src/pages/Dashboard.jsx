@@ -4,7 +4,6 @@ import { FiEdit2, FiTrash2, FiSend, FiPlus } from 'react-icons/fi'
 import Button from '@/components/Button.jsx'
 import PortalShell from '@/components/PortalShell.jsx'
 import { useAuth } from '@/context/AuthContext.jsx'
-import { Pagination, errorText } from '@/components/admin/UI.jsx'
 import { cn } from '@/utils/cn.js'
 import api from '@/lib/axios.js'
 
@@ -18,34 +17,30 @@ export default function Dashboard() {
   const { user } = useAuth()
   const [posts, setPosts] = useState(null)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
-  const [pagination, setPagination] = useState(null)
-  const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!user) return
     try {
-      const { data } = await api.get('/portal/blog/', { params: { page, author: user.id, ordering: '-updated_at' } })
+      const { data } = await api.get('/portal/blog/', { params: { author: user.id, ordering: '-updated_at' } })
       setPosts(data.results ?? data)
-      setPagination(data)
     } catch {
       setError('Could not load your posts.')
     }
-  }, [user, page])
+  }, [user])
 
   useEffect(() => {
     load()
   }, [load])
 
   const submitForReview = async (slug) => {
-    setBusy(true); setError('')
-    try { await api.post(`/portal/blog/${slug}/submit/`); await load() } catch(e) { setError(errorText(e)) } finally { setBusy(false) }
+    await api.post(`/portal/blog/${slug}/submit/`)
+    load()
   }
 
   const remove = async (slug) => {
     if (!window.confirm('Delete this post? This can’t be undone.')) return
-    setBusy(true); setError('')
-    try { await api.delete(`/portal/blog/${slug}/`); await load() } catch(e) { setError(errorText(e)) } finally { setBusy(false) }
+    await api.delete(`/portal/blog/${slug}/`)
+    load()
   }
 
   return (
@@ -83,16 +78,14 @@ export default function Dashboard() {
                 <p className="mt-1 text-sm text-slate">{post.excerpt}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {['draft', 'changes_requested', 'rejected'].includes(post.status) && (
+                {post.status === 'draft' && (
                   <button
-                    disabled={busy}
                     onClick={() => submitForReview(post.slug)}
                     className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 px-3 py-1.5 text-xs font-semibold text-orange-600 hover:bg-orange-50"
                   >
                     <FiSend className="h-3.5 w-3.5" /> Submit
                   </button>
                 )}
-                <Link to={`/posts/${post.slug}/review`} className="text-xs font-semibold text-orange-600">Feedback & history</Link>
                 <Link
                   to={`/posts/${post.slug}/edit`}
                   aria-label="Edit"
@@ -101,7 +94,6 @@ export default function Dashboard() {
                   <FiEdit2 className="h-3.5 w-3.5" />
                 </Link>
                 <button
-                  disabled={busy || post.is_live || post.status === 'scheduled'}
                   onClick={() => remove(post.slug)}
                   aria-label="Delete"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line-strong text-slate hover:border-red-400/60 hover:text-red-500"
@@ -113,7 +105,6 @@ export default function Dashboard() {
           ))}
         </div>
       )}
-      <Pagination data={pagination} page={page} setPage={setPage} />
     </PortalShell>
   )
 }
