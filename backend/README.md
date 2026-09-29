@@ -107,3 +107,14 @@ ADMIN_EMAILS=<comma-separated admin emails>
   string → Transaction pooler tab.
 - Cloud storage for `cover_image` uploads is still unaddressed — local disk
   works for dev only and won't persist on Vercel's serverless filesystem.
+
+## Editorial workspace update
+
+The repository [README](../README.md) describes the current roles, revision model,
+release migrations, scheduling and analytics. It supersedes the original workflow
+notes above: published snapshots now remain live during edits; reviewers can
+review content; explicit portal role assignments survive Google sign-in; disabled
+users cannot sign in. Use the portal to edit posts and categories so changes are
+audited; their Django admin pages are read-only.
+
+New API routes include `/api/portal/admin/{overview,people,categories,activity,notifications,settings,analytics}/`, post-level `/comments/`, `/revisions/`, `/restore/`, `/request-changes/`, `/assign/`, `/unpublish/`, `/cancel-schedule/`, `/feature/`, `/quality/`, and `/check-links/`. Review decisions and restore require `expected_version`; edits accept it to reject stale changes with HTTP 409. `approve` accepts an optional ISO-8601 `scheduled_at` timestamp. Authors cannot set publication or ownership fields through generic post updates.
