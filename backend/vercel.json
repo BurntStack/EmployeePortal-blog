@@ -1,5 +1,8 @@
 {
-  "regions": ["hnd1"],
+  "buildCommand": "bash vercel-build.sh",
+  "regions": [
+    "hnd1"
+  ],
   "functions": {
     "config/wsgi.py": {
       "memory": 2048
