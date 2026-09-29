@@ -22,6 +22,7 @@ export default function PostEditor() {
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [version, setVersion] = useState(null)
 
   const suggestedReadingTime = useMemo(() => estimateReadingTime(form.content), [form.content])
 
@@ -38,10 +39,11 @@ export default function PostEditor() {
           title: data.title,
           excerpt: data.excerpt,
           content: data.content,
-          category_id: '',
+          category_id: data.category_id || '',
           tags: (data.tags || []).join(', '),
           reading_time: data.reading_time,
         })
+        setVersion(data.version)
         setExistingCover(data.cover_image || '')
         setReadingTimeTouched(true)
       })
@@ -56,7 +58,8 @@ export default function PostEditor() {
     fd.append('title', form.title)
     fd.append('excerpt', form.excerpt)
     fd.append('content', form.content)
-    if (form.category_id) fd.append('category_id', form.category_id)
+    fd.append('category_id', form.category_id || '')
+    if (version) fd.append('expected_version', String(version))
     fd.append('tags', JSON.stringify(form.tags.split(',').map((t) => t.trim()).filter(Boolean)))
     fd.append('reading_time', String(form.reading_time || suggestedReadingTime))
     if (coverFile) fd.append('cover_image', coverFile)

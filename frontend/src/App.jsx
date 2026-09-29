@@ -5,6 +5,9 @@ import ProtectedRoute from '@/components/ProtectedRoute.jsx'
 import Login from '@/pages/Login.jsx'
 import Dashboard from '@/pages/Dashboard.jsx'
 import Review from '@/pages/Review.jsx'
+import AdminWorkspace from '@/pages/AdminWorkspace.jsx'
+import PostReview from '@/pages/PostReview.jsx'
+import Notifications from '@/pages/Notifications.jsx'
 
 // The rich text editor (TipTap/ProseMirror) is the heaviest dependency in
 // this app — only the two post-editing routes need it, so it's kept out of
@@ -37,7 +40,10 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/review" element={<ProtectedRoute adminOnly><Review /></ProtectedRoute>} />
+        <Route path="/admin/:section?" element={<ProtectedRoute reviewerOnly><AdminWorkspace /></ProtectedRoute>} />
+        <Route path="/posts/:slug/review" element={<ProtectedRoute><PostReview /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+        <Route path="/review" element={<ProtectedRoute reviewerOnly><Review /></ProtectedRoute>} />
       </Routes>
     </AuthProvider>
   )
